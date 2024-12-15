@@ -79,7 +79,9 @@ else()
     if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
         if (NOT ANDROID) # (penguinliong) Blocking builds on Android.
             # [Global] CXX compilation option to treat all warnings as errors.
-            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror ")
+
+            # NOTE: don't turn on -Werror for future compiler compatibility.
+            # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror ")
         endif()
     endif()
 
