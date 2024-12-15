@@ -199,6 +199,11 @@ void TaskCodeGenLLVM::emit_extra_unary(UnaryOpStmt *stmt) {
   UNARY_STD(asin)
   UNARY_STD(cos)
   UNARY_STD(sin)
+
+  // sonicflux:
+  UNARY_STD(erf)
+  UNARY_STD(erfc)
+
   else if (op == UnaryOpType::sqrt) {
     llvm_val[stmt] =
         builder->CreateIntrinsic(llvm::Intrinsic::sqrt, {input_type}, {input});

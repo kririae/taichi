@@ -5,6 +5,7 @@ import pytest
 import taichi as ti
 from taichi.math import inf, isinf, isnan, nan, pi, vdir
 from tests import test_utils
+import scipy.special
 
 
 def _test_inf_nan(dt):
@@ -51,6 +52,26 @@ def test_vdir():
     make_test()
 
 
+@test_utils.test(arch=[ti.cpu, ti.cuda])
+def test_erf():
+    @ti.kernel
+    def make_test(x: float) -> float:
+        return ti.math.erf(x)
+
+    assert make_test(-0.5) == pytest.approx(scipy.special.erf(-0.5))
+    assert make_test(0.5) == pytest.approx(scipy.special.erf(0.5))
+
+
+@test_utils.test(arch=[ti.cpu, ti.cuda])
+def test_erfc():
+    @ti.kernel
+    def make_test(x: float) -> float:
+        return ti.math.erfc(x)
+
+    assert make_test(-0.5) == pytest.approx(scipy.special.erfc(-0.5))
+    assert make_test(0.5) == pytest.approx(scipy.special.erfc(0.5))
+
+
 @test_utils.test(default_fp=ti.f32, debug=True)
 def test_vector_types_f32():
     @ti.dataclass
@@ -94,14 +115,12 @@ def test_translate():
     error = 0
     translate_vec = ti.math.vec3(1.0, 2.0, 3.0)
     translate_mat = ti.math.translate(translate_vec[0], translate_vec[1], translate_vec[2])
-    translate_ref = ti.math.mat4(
-        [
-            [1.0, 0.0, 0.0, 1.0],
-            [0.0, 1.0, 0.0, 2.0],
-            [0.0, 0.0, 1.0, 3.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ]
-    )
+    translate_ref = ti.math.mat4([
+        [1.0, 0.0, 0.0, 1.0],
+        [0.0, 1.0, 0.0, 2.0],
+        [0.0, 0.0, 1.0, 3.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ])
     error += check_epsilon_equal(translate_mat, translate_ref, 0.00001)
     assert error == 0
 
@@ -112,14 +131,12 @@ def test_scale():
     error = 0
     scale_vec = ti.math.vec3(1.0, 2.0, 3.0)
     scale_mat = ti.math.scale(scale_vec[0], scale_vec[1], scale_vec[2])
-    scale_ref = ti.math.mat4(
-        [
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, 2.0, 0.0, 0.0],
-            [0.0, 0.0, 3.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ]
-    )
+    scale_ref = ti.math.mat4([
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 2.0, 0.0, 0.0],
+        [0.0, 0.0, 3.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ])
     error += check_epsilon_equal(scale_mat, scale_ref, 0.00001)
     assert error == 0
 
@@ -159,22 +176,18 @@ def test_rotation3d():
     dif0 = rotationEuler - rotationDumb
     dif1 = rotationEuler - rotationInvertedY
 
-    difRef0 = ti.math.mat4(
-        [
-            [0.05048351, -0.61339645, -0.78816002, 0.0],
-            [0.65833154, 0.61388511, -0.4355969, 0.0],
-            [0.75103329, -0.49688014, 0.4348093, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ]
-    )
-    difRef1 = ti.math.mat4(
-        [
-            [-0.60788802, 0.0, -1.22438441, 0.0],
-            [0.60837229, 0.0, -1.22340979, 0.0],
-            [1.50206658, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 0.0],
-        ]
-    )
+    difRef0 = ti.math.mat4([
+        [0.05048351, -0.61339645, -0.78816002, 0.0],
+        [0.65833154, 0.61388511, -0.4355969, 0.0],
+        [0.75103329, -0.49688014, 0.4348093, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ])
+    difRef1 = ti.math.mat4([
+        [-0.60788802, 0.0, -1.22438441, 0.0],
+        [0.60837229, 0.0, -1.22340979, 0.0],
+        [1.50206658, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+    ])
 
     error += check_epsilon_equal(dif0, difRef0, 0.00001)
     error += check_epsilon_equal(dif1, difRef1, 0.00001)

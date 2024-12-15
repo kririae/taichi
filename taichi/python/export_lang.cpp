@@ -978,6 +978,10 @@ void export_lang(py::module &m) {
   DEFINE_EXPRESSION_OP(popcnt)
   DEFINE_EXPRESSION_OP(clz)
 
+  // sonicflux:
+  DEFINE_EXPRESSION_OP(erf)
+  DEFINE_EXPRESSION_OP(erfc)
+
   DEFINE_EXPRESSION_OP(select)
   DEFINE_EXPRESSION_OP(ifte)
 

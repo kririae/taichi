@@ -341,6 +341,8 @@ class TaskCodeGenCUDA : public TaskCodeGenLLVM {
     UNARY_STD(sgn)
     UNARY_STD(acos)
     UNARY_STD(asin)
+    UNARY_STD(erf)
+    UNARY_STD(erfc)
     else {
       TI_P(unary_op_type_name(op));
       TI_NOT_IMPLEMENTED

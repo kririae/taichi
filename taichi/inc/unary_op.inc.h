@@ -24,3 +24,7 @@ PER_UNARY_OP(rsqrt)
 PER_UNARY_OP(bit_not)
 PER_UNARY_OP(logic_not)
 PER_UNARY_OP(undefined)
+
+// sonicflux: 
+PER_UNARY_OP(erf)
+PER_UNARY_OP(erfc)

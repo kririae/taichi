@@ -321,16 +321,18 @@ static void remove_useless_cuda_libdevice_functions(llvm::Module *module) {
       "lgammaf",
       "tgamma",
       "lgamma",
-      "erff",
-      "erfinvf",
-      "erfcf",
-      "erfcxf",
-      "erfcinvf",
-      "erf",
-      "erfinv",
-      "erfcx",
-      "erfcinv",
-      "erfc",
+      
+      // sonicflux: retain these functions
+      // "erff",
+      // "erfinvf",
+      // "erfcf",
+      // "erfcxf",
+      // "erfcinvf",
+      // "erf",
+      // "erfinv",
+      // "erfcx",
+      // "erfcinv",
+      // "erfc",
   };
   for (auto fn : function_name_list) {
     module->getFunction("__nv_" + fn)->eraseFromParent();
