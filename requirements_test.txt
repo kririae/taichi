@@ -7,7 +7,7 @@ numpy
 psutil
 autograd
 requests
-matplotlib<=3.7.3
+matplotlib
 cffi
 scipy
 setproctitle

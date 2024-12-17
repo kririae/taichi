@@ -256,7 +256,10 @@ void export_lang(py::module &m) {
                      &CompileConfig::offline_cache_cleaning_factor)
       .def_readwrite("num_compile_threads", &CompileConfig::num_compile_threads)
       .def_readwrite("vk_api_version", &CompileConfig::vk_api_version)
-      .def_readwrite("cuda_stack_limit", &CompileConfig::cuda_stack_limit);
+      .def_readwrite("cuda_stack_limit", &CompileConfig::cuda_stack_limit)
+
+      // sonicflux: 
+      .def_readwrite("remove_assertion", &CompileConfig::remove_assertion);
 
   m.def("reset_default_compile_config",
         [&]() { default_compile_config = CompileConfig(); });

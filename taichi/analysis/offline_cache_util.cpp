@@ -80,6 +80,9 @@ static std::vector<std::uint8_t> get_offline_cache_key_of_compile_config(
   serializer(config.real_matrix_scalarize);
   serializer(config.force_scalarize_matrix);
   serializer(config.half2_vectorization);
+
+  // sonicflux:
+  serializer(config.remove_assertion);
   serializer.finalize();
 
   return serializer.data;

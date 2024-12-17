@@ -102,6 +102,11 @@ struct CompileConfig {
 
   size_t cuda_stack_limit{0};
 
+  // sonicflux:
+  // The expected behavior of this is to remove all assertions only in the code
+  // without effecting the assertions inserted by the backend.
+  bool remove_assertion{false};
+
   CompileConfig();
 
   void fit();

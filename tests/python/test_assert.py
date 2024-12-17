@@ -122,6 +122,74 @@ def test_assert_with_check_oob():
     func()
 
 
+@test_utils.test(require=ti.extension.assertion, debug=True, gdb_trigger=False, remove_assertion=True)
+def test_assert_without_side_effect_debug():
+    x = ti.field(dtype=int, shape=())
+
+    @ti.func
+    def side_effect():
+        x[None] = 1
+        return False
+
+    @ti.kernel
+    def func():
+        assert side_effect()
+
+    func()
+    assert x[None] == 0
+
+
+@test_utils.test(require=ti.extension.assertion, debug=True, gdb_trigger=False, remove_assertion=False)
+def test_assert_with_side_effect_debug():
+    x = ti.field(dtype=int, shape=())
+
+    @ti.func
+    def side_effect():
+        x[None] = 1
+        return True
+
+    @ti.kernel
+    def func():
+        assert side_effect()
+
+    func()
+    assert x[None] == 1
+
+
+@test_utils.test(require=ti.extension.assertion, debug=False, gdb_trigger=False, remove_assertion=True)
+def test_assert_without_side_effect_release():
+    x = ti.field(dtype=int, shape=())
+
+    @ti.func
+    def side_effect():
+        x[None] = 1
+        return False
+
+    @ti.kernel
+    def func():
+        assert side_effect()
+
+    func()
+    assert x[None] == 0
+
+
+@test_utils.test(require=ti.extension.assertion, debug=False, gdb_trigger=False, remove_assertion=False)
+def test_assert_with_side_effect_release():
+    x = ti.field(dtype=int, shape=())
+
+    @ti.func
+    def side_effect():
+        x[None] = 1
+        return True
+
+    @ti.kernel
+    def func():
+        assert side_effect()
+
+    func()
+    assert x[None] == 1
+
+
 @test_utils.test(arch=get_host_arch_list())
 def test_static_assert_message():
     x = 3

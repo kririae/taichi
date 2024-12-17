@@ -62,6 +62,9 @@ CompileConfig::CompileConfig() {
   // CUDA/AMDGPU backend options:
   device_memory_GB = 1;  // by default, preallocate 1 GB GPU memory
   device_memory_fraction = 0.0;
+
+  // sonicflux:
+  remove_assertion = false;
 }
 
 void CompileConfig::fit() {

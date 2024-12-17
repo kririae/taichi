@@ -1653,6 +1653,9 @@ class ASTTransformer(Builder):
 
     @staticmethod
     def build_Assert(ctx, node):
+        if impl.current_cfg().remove_assertion:
+            return None
+
         extra_args = []
         if node.msg is not None:
             if ASTTransformer._is_string_mod_args(node.msg):
