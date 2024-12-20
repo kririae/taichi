@@ -1,13 +1,16 @@
 #include "taichi/runtime/cuda/jit_cuda.h"
 #include "taichi/runtime/llvm/llvm_context.h"
 
+// sonicflux:
+#include "llvm/Passes/PassBuilder.h"
+
 namespace taichi::lang {
 
 #if defined(TI_WITH_CUDA)
 
 JITModule *JITSessionCUDA ::add_module(std::unique_ptr<llvm::Module> M,
                                        int max_reg) {
-  auto ptx = compile_module_to_ptx(M);
+  auto ptx = compile_module_to_ptx_pb(M);
   if (this->config_.print_kernel_asm) {
     static FileSequenceWriter writer("taichi_kernel_nvptx_{:04d}.ptx",
                                      "module NVPTX");
@@ -179,7 +182,7 @@ std::string JITSessionCUDA::compile_module_to_ptx(
   }
 
   PassManagerBuilder b;
-  b.OptLevel = 3;
+  b.OptLevel = 2;
   b.Inliner = createFunctionInliningPass(b.OptLevel, 0, false);
   b.LoopVectorize = false;
   b.SLPVectorize = false;
@@ -235,6 +238,150 @@ std::string JITSessionCUDA::compile_module_to_ptx(
   std::string buffer(outstr.begin(), outstr.end());
 
   // Null-terminate the ptx source
+  buffer.push_back(0);
+  return buffer;
+}
+
+std::string JITSessionCUDA::compile_module_to_ptx_pb(
+    std::unique_ptr<llvm::Module> &module) {
+  TI_AUTO_PROF
+  // Part of this function is borrowed from Halide::CodeGen_PTX_Dev.cpp
+  if (llvm::verifyModule(*module, &llvm::errs())) {
+    module->print(llvm::errs(), nullptr);
+    TI_ERROR("LLVM Module broken");
+  }
+
+  using namespace llvm;
+
+  if (this->config_.print_kernel_llvm_ir) {
+    static FileSequenceWriter writer("taichi_kernel_cuda_llvm_ir_{:04d}.ll",
+                                     "unoptimized LLVM IR (CUDA)");
+    writer.write(module.get());
+  }
+
+  for (auto &f : module->globals())
+    f.setName(convert(f.getName().str()));
+  for (auto &f : *module)
+    f.setName(convert(f.getName().str()));
+
+  llvm::Triple triple(module->getTargetTriple());
+
+  // Allocate target machine
+  std::string err_str;
+  const llvm::Target *target =
+      TargetRegistry::lookupTarget(triple.str(), err_str);
+  TI_ERROR_UNLESS(target, err_str);
+
+  TargetOptions options;
+  if (this->config_.fast_math) {
+    options.AllowFPOpFusion = FPOpFusion::Fast;
+    // See NVPTXISelLowering.cpp
+    // Setting UnsafeFPMath true will result in approximations such as
+    // sqrt.approx in PTX for both f32 and f64
+    options.UnsafeFPMath = 1;
+    options.NoInfsFPMath = 1;
+    options.NoNaNsFPMath = 1;
+  } else {
+    options.AllowFPOpFusion = FPOpFusion::Strict;
+    options.UnsafeFPMath = 0;
+    options.NoInfsFPMath = 0;
+    options.NoNaNsFPMath = 0;
+  }
+
+  options.HonorSignDependentRoundingFPMathOption = 0;
+  options.NoZerosInBSS = 0;
+  options.GuaranteedTailCallOpt = 0;
+
+  std::unique_ptr<TargetMachine> target_machine(target->createTargetMachine(
+      triple.str(), CUDAContext::get_instance().get_mcpu(), cuda_mattrs(),
+      options, llvm::Reloc::PIC_, llvm::CodeModel::Small,
+      CodeGenOpt::Aggressive));
+
+  TI_ERROR_UNLESS(target_machine.get(), "Could not allocate target machine!");
+
+  module->setTargetTriple(triple.str());
+  module->setDataLayout(target_machine->createDataLayout());
+
+  // NVidia's libdevice library uses a __nvvm_reflect to choose
+  // how to handle denormalized numbers. (The pass replaces calls
+  // to __nvvm_reflect with a constant via a map lookup. The inliner
+  // pass then resolves these situations to fast code, often a single
+  // instruction per decision point.)
+  //
+  // The default is (more) IEEE like handling. FTZ mode flushes them
+  // to zero. (This may only apply to single-precision.)
+  //
+  // The libdevice documentation covers other options for math accuracy
+  // such as replacing division with multiply by the reciprocal and
+  // use of fused-multiply-add, but they do not seem to be controlled
+  // by this __nvvvm_reflect mechanism and may be flags to earlier compiler
+  // passes.
+  const auto kFTZDenorms = 1;
+
+  // Insert a module flag for the FTZ handling.
+  module->addModuleFlag(llvm::Module::Override, "nvvm-reflect-ftz",
+                        kFTZDenorms);
+
+  if (kFTZDenorms) {
+    for (llvm::Function &fn : *module) {
+      /* nvptx-f32ftz was deprecated.
+       *
+       * https://github.com/llvm/llvm-project/commit/a4451d88ee456304c26d552749aea6a7f5154bde#diff-6fda74ef428299644e9f49a2b0994c0d850a760b89828f655030a114060d075a
+       */
+      fn.addFnAttr("denormal-fp-math-f32", "preserve-sign");
+
+      // Use unsafe fp math for sqrt.approx instead of sqrt.rn
+      fn.addFnAttr("unsafe-fp-math", "true");
+    }
+  }
+
+  // Create the new analysis manager
+  llvm::LoopAnalysisManager LAM;
+  llvm::FunctionAnalysisManager FAM;
+  llvm::CGSCCAnalysisManager CGAM;
+  llvm::ModuleAnalysisManager MAM;
+
+  // Create the new pass builder
+  llvm::PipelineTuningOptions PTO;
+  PTO.LoopUnrolling = false;
+  PTO.LoopVectorization = false;
+  PTO.SLPVectorization = false;
+  llvm::PassBuilder PB(target_machine.get(), PTO);
+
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+  // sonicflux: use directly the default pipeline for now.
+  llvm::ModulePassManager MPM =
+      PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
+
+  {
+    TI_PROFILER("llvm_module_pass");
+    MPM.run(*module, MAM);
+  }
+
+  if (this->config_.print_kernel_llvm_ir_optimized) {
+    static FileSequenceWriter writer(
+        "taichi_kernel_cuda_llvm_ir_optimized_{:04d}.ll",
+        "optimized LLVM IR (CUDA)");
+    writer.write(module.get());
+  }
+
+  // sonicflux: dump the PTX produced
+  llvm::SmallString<8> outstr;
+  raw_svector_ostream ostream(outstr);
+  ostream.SetUnbuffered();
+
+  llvm::legacy::PassManager LPM;
+  bool fail = target_machine->addPassesToEmitFile(
+      LPM, ostream, nullptr, llvm::CGFT_AssemblyFile, true);
+  TI_ERROR_IF(fail, "Failed to set up passes to emit PTX source\n");
+  LPM.run(*module);
+
+  std::string buffer(outstr.begin(), outstr.end());
   buffer.push_back(0);
   return buffer;
 }

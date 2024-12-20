@@ -19,6 +19,9 @@
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 
+// sonicflux:
+#include "llvm/Passes/PassBuilder.h"
+
 namespace taichi::lang {
 
 namespace {
@@ -262,76 +265,60 @@ void KernelCodeGenCPU::optimize_module(llvm::Module *module) {
     options.NoInfsFPMath = 0;
     options.NoNaNsFPMath = 0;
   }
+
   options.HonorSignDependentRoundingFPMathOption = false;
   options.NoZerosInBSS = false;
   options.GuaranteedTailCallOpt = false;
-
-  llvm::legacy::FunctionPassManager function_pass_manager(module);
-  llvm::legacy::PassManager module_pass_manager;
 
   llvm::StringRef mcpu = llvm::sys::getHostCPUName();
   std::unique_ptr<llvm::TargetMachine> target_machine(
       target->createTargetMachine(triple.str(), mcpu.str(), "", options,
                                   llvm::Reloc::PIC_, llvm::CodeModel::Small,
                                   llvm::CodeGenOpt::Aggressive));
-
   TI_ERROR_UNLESS(target_machine.get(), "Could not allocate target machine!");
 
+  module->setTargetTriple(triple.str());
   module->setDataLayout(target_machine->createDataLayout());
 
-  module_pass_manager.add(llvm::createTargetTransformInfoWrapperPass(
-      target_machine->getTargetIRAnalysis()));
-  function_pass_manager.add(llvm::createTargetTransformInfoWrapperPass(
-      target_machine->getTargetIRAnalysis()));
+  // Create the new analysis manager
+  llvm::LoopAnalysisManager LAM;
+  llvm::FunctionAnalysisManager FAM;
+  llvm::CGSCCAnalysisManager CGAM;
+  llvm::ModuleAnalysisManager MAM;
 
-  llvm::PassManagerBuilder b;
-  b.OptLevel = 3;
-  b.Inliner = llvm::createFunctionInliningPass(b.OptLevel, 0, false);
-  b.LoopVectorize = true;
-  b.SLPVectorize = true;
+  // Create the new pass builder
+  llvm::PipelineTuningOptions PTO;
+  PTO.LoopUnrolling = false;
+  PTO.LoopVectorization = false;
+  PTO.SLPVectorization = false;
+  llvm::PassBuilder PB(target_machine.get(), PTO);
 
-  target_machine->adjustPassManager(b);
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-  b.populateFunctionPassManager(function_pass_manager);
-  b.populateModulePassManager(module_pass_manager);
-
-  {
-    TI_PROFILER("llvm_function_pass");
-    function_pass_manager.doInitialization();
-    for (llvm::Module::iterator i = module->begin(); i != module->end(); i++)
-      function_pass_manager.run(*i);
-
-    function_pass_manager.doFinalization();
-  }
-
-  /*
-    Optimization for llvm::GetElementPointer:
-    https://github.com/taichi-dev/taichi/issues/5472 The three other passes
-    "loop-reduce", "ind-vars", "cse" serves as preprocessing for
-    "separate-const-offset-gep".
-
-    Note there's an update for "separate-const-offset-gep" in llvm-12.
-  */
-  module_pass_manager.add(llvm::createLoopStrengthReducePass());
-  module_pass_manager.add(llvm::createIndVarSimplifyPass());
-  module_pass_manager.add(llvm::createSeparateConstOffsetFromGEPPass(false));
-  module_pass_manager.add(llvm::createEarlyCSEPass(true));
+  // sonicflux: use directly the default pipeline for now.
+  llvm::ModulePassManager MPM =
+      PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
 
   llvm::SmallString<8> outstr;
   llvm::raw_svector_ostream ostream(outstr);
   ostream.SetUnbuffered();
-  if (compile_config.print_kernel_asm) {
-    // Generate assembly code if neccesary
-    target_machine->addPassesToEmitFile(module_pass_manager, ostream, nullptr,
-                                        llvm::CGFT_AssemblyFile);
-  }
 
   {
     TI_PROFILER("llvm_module_pass");
-    module_pass_manager.run(*module);
+    MPM.run(*module, MAM);
   }
 
   if (compile_config.print_kernel_asm) {
+    llvm::legacy::PassManager LPM;
+    bool fail = target_machine->addPassesToEmitFile(LPM, ostream, nullptr,
+                                                    llvm::CGFT_AssemblyFile);
+    TI_ERROR_IF(fail, "Failed to setup the CPU assembly writer");
+    LPM.run(*module);
+
     static FileSequenceWriter writer(
         "taichi_kernel_cpu_llvm_ir_optimized_asm_{:04d}.s",
         "optimized assembly code (CPU)");
@@ -344,6 +331,7 @@ void KernelCodeGenCPU::optimize_module(llvm::Module *module) {
       TI_INFO("Functions with > 100 instructions in optimized LLVM IR:");
       TaichiLLVMContext::print_huge_functions(module);
     }
+
     static FileSequenceWriter writer(
         "taichi_kernel_cpu_llvm_ir_optimized_{:04d}.ll",
         "optimized LLVM IR (CPU)");
