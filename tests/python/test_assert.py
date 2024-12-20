@@ -156,6 +156,23 @@ def test_assert_with_side_effect_debug():
     assert x[None] == 1
 
 
+@test_utils.test(require=ti.extension.assertion, debug=True, gdb_trigger=False)
+def test_assert_debug_default():
+    x = ti.field(dtype=int, shape=())
+
+    @ti.func
+    def side_effect():
+        x[None] = 1
+        return True
+
+    @ti.kernel
+    def func():
+        assert side_effect()
+
+    func()
+    assert x[None] == 1
+
+
 @test_utils.test(require=ti.extension.assertion, debug=False, gdb_trigger=False, remove_assertion=True)
 def test_assert_without_side_effect_release():
     x = ti.field(dtype=int, shape=())
@@ -188,6 +205,60 @@ def test_assert_with_side_effect_release():
 
     func()
     assert x[None] == 1
+
+
+@test_utils.test(require=ti.extension.assertion, debug=False, gdb_trigger=False)
+def test_assert_release_default():
+    x = ti.field(dtype=int, shape=())
+
+    @ti.func
+    def side_effect():
+        x[None] = 1
+        return False
+
+    @ti.kernel
+    def func():
+        assert side_effect()
+
+    func()
+    assert x[None] == 0
+
+
+@test_utils.test(require=ti.extension.assertion, debug=False, gdb_trigger=False, remove_assertion=False)
+def test_assert_release_trigger():
+    x = ti.field(dtype=int, shape=())
+
+    @ti.func
+    def side_effect():
+        x[None] = 1
+        return False
+
+    @ti.kernel
+    def func():
+        assert side_effect()
+
+    with pytest.raises(AssertionError):
+        func()
+    assert x[None] == 1
+
+
+@test_utils.test(
+    require=ti.extension.assertion, debug=False, gdb_trigger=False, remove_assertion=True, check_out_of_bound=True
+)
+def test_assert_release_trigger_out_of_bounds():
+    idx = ti.field(dtype=int, shape=())
+    x = ti.field(dtype=int, shape=(1,))
+
+    @ti.kernel
+    def func():
+        x[idx[None]] = 1
+
+    idx[None] = 0
+    func()
+
+    with pytest.raises(AssertionError):
+        idx[None] = 1
+        func()
 
 
 @test_utils.test(arch=get_host_arch_list())

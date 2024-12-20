@@ -190,7 +190,15 @@ const CompiledKernelData &Program::compile_kernel(
 void Program::launch_kernel(const CompiledKernelData &compiled_kernel_data,
                             LaunchContextBuilder &ctx) {
   program_impl_->get_kernel_launcher().launch_kernel(compiled_kernel_data, ctx);
-  if (compile_config().debug && arch_uses_llvm(compiled_kernel_data.arch())) {
+
+  // sonicflux:
+  // The previous behavior is, whether or not `debug` is enabled, assertion
+  // stmts are inserted, but the error is not checked, resulting in a silent
+  // failure. This will fail the out_of_bound test, which is not covered by the
+  // unit tests.
+  //
+  // Now the error is always checked even in release mode.
+  if (arch_uses_llvm(compiled_kernel_data.arch())) {
     program_impl_->check_runtime_error(result_buffer);
   }
 }

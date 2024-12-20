@@ -82,7 +82,7 @@ static std::vector<std::uint8_t> get_offline_cache_key_of_compile_config(
   serializer(config.half2_vectorization);
 
   // sonicflux:
-  serializer(config.remove_assertion);
+  serializer(config.remove_assertion.value());
   serializer.finalize();
 
   return serializer.data;

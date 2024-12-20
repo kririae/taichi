@@ -64,7 +64,7 @@ CompileConfig::CompileConfig() {
   device_memory_fraction = 0.0;
 
   // sonicflux:
-  remove_assertion = false;
+  remove_assertion = std::nullopt;
 }
 
 void CompileConfig::fit() {
@@ -74,6 +74,11 @@ void CompileConfig::fit() {
   }
   if (arch_uses_spirv(arch)) {
     demote_dense_struct_fors = true;
+  }
+
+  // sonicflux:
+  if (!remove_assertion.has_value()) {
+    remove_assertion = !debug;
   }
   offline_cache::disable_offline_cache_if_needed(this);
 }

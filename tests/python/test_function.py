@@ -42,7 +42,7 @@ def test_function_with_return():
     assert x[None] == 42
 
 
-@test_utils.test(arch=[ti.cpu, ti.cuda])
+@test_utils.test(arch=[ti.cpu, ti.cuda], debug=True)
 def test_call_expressions():
     x = ti.field(ti.i32, shape=())
 
@@ -252,7 +252,7 @@ def test_deep_recursion():
     assert sum(100) == 5050
 
 
-@test_utils.test(arch=[ti.cpu, ti.cuda])
+@test_utils.test(arch=[ti.cpu, ti.cuda], debug=True)
 def test_multiple_return():
     x = ti.field(ti.i32, shape=())
 

@@ -128,6 +128,10 @@ user_api[ti] = [
     "dx11",
     "dx12",
     "eig",
+
+    # sonicflux:
+    "erf",
+    "erfc",
     "exp",
     "experimental",
     "extension",
@@ -300,6 +304,10 @@ user_api[ti.math] = [
     "distance",
     "dot",
     "e",
+
+    # sonicflux:
+    "erf",
+    "erfc",
     "exp",
     "eye",
     "floor",
