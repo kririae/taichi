@@ -150,8 +150,11 @@ else()
 endif()
 set(HOST_ARCH ${ARCH} CACHE INTERNAL "Host arch")
 
-if (USE_STDCPP)
+if(USE_STDCPP 
+    AND CMAKE_C_COMPILER_ID MATCHES "(Apple)?[Cc]lang" 
+    AND CMAKE_CXX_COMPILER_ID MATCHES "(Apple)?[Cc]lang")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libc++ -lc++abi")
 endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DTI_PASS_EXCEPTION_TO_PYTHON")
