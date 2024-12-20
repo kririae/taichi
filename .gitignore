@@ -91,5 +91,4 @@ imgui.ini
 *.dylib
 *.ply
 
-/external/llvm-15
-
+/external/llvm-*
