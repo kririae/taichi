@@ -229,7 +229,6 @@ static llvm::Triple get_host_target_triple() {
   }
   return expected_jtmb->getTargetTriple();
 }
-
 }  // namespace
 
 #ifdef TI_WITH_LLVM
@@ -288,9 +287,10 @@ void KernelCodeGenCPU::optimize_module(llvm::Module *module) {
 
   // Create the new pass builder
   llvm::PipelineTuningOptions PTO;
-  PTO.LoopUnrolling = false;
-  PTO.LoopVectorization = false;
-  PTO.SLPVectorization = false;
+  PTO.LoopInterleaving = true;
+  PTO.LoopVectorization = true;
+  PTO.SLPVectorization = true;
+  PTO.LoopUnrolling = true;
   llvm::PassBuilder PB(target_machine.get(), PTO);
 
   PB.registerModuleAnalyses(MAM);
@@ -301,19 +301,31 @@ void KernelCodeGenCPU::optimize_module(llvm::Module *module) {
 
   // sonicflux: use directly the default pipeline for now.
   llvm::ModulePassManager MPM =
-      PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
-
-  llvm::SmallString<8> outstr;
-  llvm::raw_svector_ostream ostream(outstr);
-  ostream.SetUnbuffered();
+      PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O3);
+  target_machine->registerPassBuilderCallbacks(PB);
 
   {
     TI_PROFILER("llvm_module_pass");
     MPM.run(*module, MAM);
   }
 
+  if (llvm::verifyModule(*module, &llvm::errs())) {
+    module->print(llvm::errs(), nullptr);
+    TI_ERROR("LLVM Module broken");
+  }
+
   if (compile_config.print_kernel_asm) {
+    llvm::SmallString<8> outstr;
+    llvm::raw_svector_ostream ostream(outstr);
+    ostream.SetUnbuffered();
+
     llvm::legacy::PassManager LPM;
+    LPM.add(llvm::createTargetTransformInfoWrapperPass(
+        target_machine->getTargetIRAnalysis()));
+
+    // Override default to generate verbose assembly.
+    target_machine->Options.MCOptions.AsmVerbose = true;
+
     bool fail = target_machine->addPassesToEmitFile(LPM, ostream, nullptr,
                                                     llvm::CGFT_AssemblyFile);
     TI_ERROR_IF(fail, "Failed to setup the CPU assembly writer");
@@ -338,6 +350,5 @@ void KernelCodeGenCPU::optimize_module(llvm::Module *module) {
     writer.write(module);
   }
 }
-
 #endif  // TI_WITH_LLVM
 }  // namespace taichi::lang

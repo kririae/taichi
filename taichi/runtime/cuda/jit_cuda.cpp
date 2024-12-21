@@ -16,9 +16,11 @@ JITModule *JITSessionCUDA ::add_module(std::unique_ptr<llvm::Module> M,
                                      "module NVPTX");
     writer.write(ptx);
   }
+
   // TODO: figure out why using the guard leads to wrong tests results
   // auto context_guard = CUDAContext::get_instance().get_guard();
   CUDAContext::get_instance().make_current();
+
   // Create module for object
   void *cuda_module;
   TI_TRACE("PTX size: {:.2f}KB", ptx.size() / 1024.0);
@@ -43,12 +45,13 @@ JITModule *JITSessionCUDA ::add_module(std::unique_ptr<llvm::Module> M,
   CUDADriver::get_instance().module_load_data_ex(
       &cuda_module, ptx.c_str(), num_options, options, option_values);
   TI_TRACE("CUDA module load time : {}ms", (Time::get_time() - t) * 1000);
-  // cudaModules.push_back(cudaModule);
+
   modules.push_back(std::make_unique<JITModuleCUDA>(cuda_module));
   return modules.back().get();
 }
 
 std::string cuda_mattrs() {
+  // TODO: upgrade to ptx78 as supported by LLVM 16
   return "+ptx63";
 }
 
@@ -177,9 +180,10 @@ std::string JITSessionCUDA::compile_module_to_ptx(
 
   // Create the new pass builder
   llvm::PipelineTuningOptions PTO;
-  PTO.LoopUnrolling = false;
+  PTO.LoopInterleaving = false;
   PTO.LoopVectorization = false;
-  PTO.SLPVectorization = false;
+  PTO.SLPVectorization = true;
+  PTO.LoopUnrolling = false;
   llvm::PassBuilder PB(target_machine.get(), PTO);
 
   PB.registerModuleAnalyses(MAM);
@@ -190,11 +194,17 @@ std::string JITSessionCUDA::compile_module_to_ptx(
 
   // sonicflux: use directly the default pipeline for now.
   llvm::ModulePassManager MPM =
-      PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
+      PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O3);
+  target_machine->registerPassBuilderCallbacks(PB);
 
   {
     TI_PROFILER("llvm_module_pass");
     MPM.run(*module, MAM);
+  }
+
+  if (llvm::verifyModule(*module, &llvm::errs())) {
+    module->print(llvm::errs(), nullptr);
+    TI_ERROR("LLVM Module broken");
   }
 
   if (this->config_.print_kernel_llvm_ir_optimized) {
@@ -210,6 +220,12 @@ std::string JITSessionCUDA::compile_module_to_ptx(
   ostream.SetUnbuffered();
 
   llvm::legacy::PassManager LPM;
+  LPM.add(createTargetTransformInfoWrapperPass(
+      target_machine->getTargetIRAnalysis()));
+
+  // Override default to generate verbose assembly.
+  target_machine->Options.MCOptions.AsmVerbose = true;
+
   bool fail = target_machine->addPassesToEmitFile(
       LPM, ostream, nullptr, llvm::CGFT_AssemblyFile, true);
   TI_ERROR_IF(fail, "Failed to set up passes to emit PTX source\n");
