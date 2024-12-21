@@ -49,11 +49,11 @@ def dtype_size(ti_dtype):
 def get_ti_arch(arch: str):
     arch_dict = {
         "cuda": ti.cuda,
-        "vulkan": ti.vulkan,
-        "opengl": ti.opengl,
-        "metal": ti.metal,
+        # "vulkan": ti.vulkan,
+        # "opengl": ti.opengl,
+        # "metal": ti.metal,
         "x64": ti.x64,
-        "cc": ti.cc,
+        # "cc": ti.cc,
     }
     return arch_dict[arch]
 

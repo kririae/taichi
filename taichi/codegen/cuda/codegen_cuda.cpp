@@ -65,16 +65,24 @@ class TaskCodeGenCUDA : public TaskCodeGenLLVM {
                             const std::vector<llvm::Value *> &values) {
     auto stype = llvm::StructType::get(*llvm_context, types, false);
     auto value_arr = builder->CreateAlloca(stype);
+
     for (int i = 0; i < values.size(); i++) {
       auto value_ptr = builder->CreateGEP(
           stype, value_arr, {tlctx->get_constant(0), tlctx->get_constant(i)});
       builder->CreateStore(values[i], value_ptr);
     }
+
+    // sonicflux: the original vprintf(`cuda_vprintf` inside
+    // `llvm/runtime_module/runtime.cpp`) is compiled with opaque pointer.
+    //
+    // ```llvm
+    // declare void @cuda_vprintf(ptr noundef, ptr noundef) #2
+    // ```
     return LLVMModuleBuilder::call(
         builder.get(), "vprintf",
         builder->CreateGlobalStringPtr(format, "format_string"),
         builder->CreateBitCast(value_arr,
-                               llvm::Type::getInt8PtrTy(*llvm_context)));
+                               llvm::PointerType::get(*llvm_context, 0)));
   }
 
   std::tuple<llvm::Value *, llvm::Type *> create_value_and_type(

@@ -8,7 +8,6 @@
 #include "taichi/util/file_sequence_writer.h"
 
 namespace taichi::lang {
-
 StructCompilerLLVM::StructCompilerLLVM(Arch arch,
                                        const CompileConfig &config,
                                        TaichiLLVMContext *tlctx,
@@ -206,10 +205,9 @@ void StructCompilerLLVM::generate_child_accessors(SNode &snode) {
 
     auto inp_type =
         llvm::PointerType::get(get_llvm_element_type(module.get(), parent), 0);
-
     auto ft =
-        llvm::FunctionType::get(llvm::Type::getInt8PtrTy(*llvm_ctx_),
-                                {llvm::Type::getInt8PtrTy(*llvm_ctx_)}, false);
+        llvm::FunctionType::get(llvm::PointerType::get(*llvm_ctx_, 0),
+                                {llvm::PointerType::get(*llvm_ctx_, 0)}, false);
 
     auto func = create_function(ft, snode.get_ch_from_parent_func_name());
 
@@ -221,15 +219,14 @@ void StructCompilerLLVM::generate_child_accessors(SNode &snode) {
     for (auto &arg : func->args()) {
       args.push_back(&arg);
     }
+
     llvm::Value *ret;
     ret = builder.CreateGEP(get_llvm_element_type(module.get(), parent),
                             builder.CreateBitCast(args[0], inp_type),
                             {tlctx_->get_constant(0),
                              tlctx_->get_constant(parent->child_id(&snode))},
                             "getch");
-
-    builder.CreateRet(
-        builder.CreateBitCast(ret, llvm::Type::getInt8PtrTy(*llvm_ctx_)));
+    builder.CreateRet(ret);
   }
 
   for (auto &ch : snode.ch) {
@@ -311,5 +308,4 @@ llvm::Function *StructCompilerLLVM::create_function(llvm::FunctionType *ft,
   return llvm::Function::Create(ft, llvm::Function::ExternalLinkage, func_name,
                                 *module);
 }
-
 }  // namespace taichi::lang
