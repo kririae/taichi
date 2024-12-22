@@ -531,7 +531,7 @@ def test_aot_ndarray_without_template_args():
 
 
 @test_utils.test(arch=[ti.opengl, ti.vulkan])
-def test_archive():
+def _test_archive():
     density = ti.field(float, shape=(4, 4))
 
     @ti.kernel

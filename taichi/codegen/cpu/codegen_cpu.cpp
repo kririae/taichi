@@ -56,7 +56,7 @@ class TaskCodeGenCPU : public TaskCodeGenLLVM {
     {
       auto guard = get_function_creation_guard(
           {llvm::PointerType::get(get_runtime_type("RuntimeContext"), 0),
-           llvm::Type::getInt8PtrTy(*llvm_context),
+           llvm::PointerType::get(*llvm_context, 0),
            tlctx->get_data_type<int>()});
 
       auto loop_var = create_entry_block_alloca(PrimitiveType::i32);
@@ -84,7 +84,7 @@ class TaskCodeGenCPU : public TaskCodeGenLLVM {
     {
       auto guard = get_function_creation_guard(
           {llvm::PointerType::get(get_runtime_type("RuntimeContext"), 0),
-           llvm::Type::getInt8PtrTy(*llvm_context),
+           llvm::PointerType::get(*llvm_context, 0),
            tlctx->get_data_type<int>()});
 
       for (int i = 0; i < stmt->mesh_prologue->size(); i++) {

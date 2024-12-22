@@ -1684,10 +1684,9 @@ llvm::Value *TaskCodeGenLLVM::call(
   auto prefix = get_runtime_snode_name(snode);
   auto s = emit_struct_meta(snode);
   auto s_ptr =
-      builder->CreateBitCast(s, llvm::Type::getInt8PtrTy(*llvm_context));
-
-  node_ptr =
-      builder->CreateBitCast(node_ptr, llvm::Type::getInt8PtrTy(*llvm_context));
+      builder->CreateBitCast(s, llvm::PointerType::get(*llvm_context, 0));
+  node_ptr = builder->CreateBitCast(node_ptr,
+                                    llvm::PointerType::get(*llvm_context, 0));
 
   std::vector<llvm::Value *> func_arguments{s_ptr, node_ptr};
 
@@ -2634,7 +2633,7 @@ llvm::Value *TaskCodeGenLLVM::get_tls_base_ptr() {
 }
 
 llvm::Type *TaskCodeGenLLVM::get_tls_buffer_type() {
-  return llvm::Type::getInt8PtrTy(*llvm_context);
+  return llvm::PointerType::get(*llvm_context, 0);
 }
 
 std::vector<llvm::Type *> TaskCodeGenLLVM::get_xlogue_argument_types() {
@@ -2658,6 +2657,7 @@ llvm::Type *TaskCodeGenLLVM::get_mesh_xlogue_function_type() {
 }
 
 llvm::PointerType *TaskCodeGenLLVM::get_integer_ptr_type(int bits) {
+#if 0
   switch (bits) {
     case 8:
       return llvm::Type::getInt8PtrTy(*llvm_context);
@@ -2667,6 +2667,17 @@ llvm::PointerType *TaskCodeGenLLVM::get_integer_ptr_type(int bits) {
       return llvm::Type::getInt32PtrTy(*llvm_context);
     case 64:
       return llvm::Type::getInt64PtrTy(*llvm_context);
+    default:
+      break;
+  }
+#endif
+  switch (bits) {
+    case 8:
+    case 16:
+    case 32:
+    case 64:
+      return llvm::PointerType::get(*llvm_context, 0);
+      // return llvm::Type::getInt64PtrTy(*llvm_context);
     default:
       break;
   }
