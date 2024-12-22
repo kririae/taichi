@@ -188,6 +188,8 @@ std::string JITSessionCUDA::compile_module_to_ptx(
   PTO.LoopVectorization = false;
   PTO.SLPVectorization = true;
   PTO.LoopUnrolling = false;
+  PTO.ForgetAllSCEVInLoopUnroll = true;
+
   llvm::PassBuilder PB(target_machine.get(), PTO);
 
   PB.registerModuleAnalyses(MAM);
@@ -196,10 +198,10 @@ std::string JITSessionCUDA::compile_module_to_ptx(
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-  // sonicflux: use directly the default pipeline for now.
+  target_machine->registerPassBuilderCallbacks(PB);
+
   llvm::ModulePassManager MPM =
       PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O3);
-  target_machine->registerPassBuilderCallbacks(PB);
 
   {
     TI_PROFILER("llvm_module_pass");

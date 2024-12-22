@@ -300,6 +300,8 @@ void KernelCodeGenCPU::optimize_module(llvm::Module *module) {
   PTO.LoopVectorization = true;
   PTO.SLPVectorization = true;
   PTO.LoopUnrolling = true;
+  PTO.ForgetAllSCEVInLoopUnroll = true;
+
   llvm::PassBuilder PB(target_machine.get(), PTO);
 
   PB.registerModuleAnalyses(MAM);
@@ -308,10 +310,10 @@ void KernelCodeGenCPU::optimize_module(llvm::Module *module) {
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-  // sonicflux: use directly the default pipeline for now.
+  target_machine->registerPassBuilderCallbacks(PB);
+
   llvm::ModulePassManager MPM =
       PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O3);
-  target_machine->registerPassBuilderCallbacks(PB);
 
   {
     TI_PROFILER("llvm_module_pass");
