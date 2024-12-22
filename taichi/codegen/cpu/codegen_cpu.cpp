@@ -12,10 +12,14 @@
 #include "taichi/ir/analysis.h"
 #include "taichi/analysis/offline_cache_util.h"
 
-#include "llvm/Support/Host.h"
+#if LLVM_VERSION_MAJOR >= 16
+#include <llvm/TargetParser/Host.h>
+#else
+#include <llvm/Support/Host.h>
+#endif
+
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Transforms/IPO.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 
@@ -269,11 +273,16 @@ void KernelCodeGenCPU::optimize_module(llvm::Module *module) {
   options.NoZerosInBSS = false;
   options.GuaranteedTailCallOpt = false;
 
+#if LLVM_VERSION_MAJOR >= 18
+  const auto opt_level = llvm::CodeGenOptLevel::Aggressive;
+#else
+  const auto opt_level = llvm::CodeGenOpt::Aggressive;
+#endif
   llvm::StringRef mcpu = llvm::sys::getHostCPUName();
   std::unique_ptr<llvm::TargetMachine> target_machine(
       target->createTargetMachine(triple.str(), mcpu.str(), "", options,
                                   llvm::Reloc::PIC_, llvm::CodeModel::Small,
-                                  llvm::CodeGenOpt::Aggressive));
+                                  opt_level));
   TI_ERROR_UNLESS(target_machine.get(), "Could not allocate target machine!");
 
   module->setTargetTriple(triple.str());
@@ -326,8 +335,13 @@ void KernelCodeGenCPU::optimize_module(llvm::Module *module) {
     // Override default to generate verbose assembly.
     target_machine->Options.MCOptions.AsmVerbose = true;
 
-    bool fail = target_machine->addPassesToEmitFile(LPM, ostream, nullptr,
-                                                    llvm::CGFT_AssemblyFile);
+#if LLVM_VERSION_MAJOR >= 18
+    const auto file_type = llvm::CodeGenFileType::AssemblyFile;
+#else
+    const auto file_type = llvm::CGFT_AssemblyFile;
+#endif
+    bool fail =
+        target_machine->addPassesToEmitFile(LPM, ostream, nullptr, file_type);
     TI_ERROR_IF(fail, "Failed to setup the CPU assembly writer");
     LPM.run(*module);
 

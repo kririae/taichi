@@ -110,7 +110,6 @@ struct CompileConfig {
   std::optional<bool> remove_assertion;
 
   CompileConfig();
-
   void fit();
 };
 

@@ -9,14 +9,20 @@
 
 namespace fs = std::filesystem;
 
-#include "llvm/ADT/Triple.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/MC/TargetRegistry.h"
-#include "llvm/Support/Host.h"
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
+
+#if LLVM_VERSION_MAJOR >= 16
+#include "llvm/TargetParser/Triple.h"
+#include "llvm/TargetParser/Host.h"
+#else
+#include "llvm/ADT/Triple.h"
+#include "llvm/Support/Host.h"
+#endif
 
 #include "taichi/rhi/arch.h"
 #include "taichi/runtime/llvm/llvm_context.h"
@@ -53,11 +59,16 @@ static std::unique_ptr<llvm::TargetMachine> get_host_target_machine() {
   options.NoZerosInBSS = false;
   options.GuaranteedTailCallOpt = false;
 
+#if LLVM_VERSION_MAJOR >= 18
+  const auto opt_level = llvm::CodeGenOptLevel::Aggressive;
+#else
+  const auto opt_level = llvm::CodeGenOpt::Aggressive;
+#endif
   llvm::StringRef mcpu = llvm::sys::getHostCPUName();
   std::unique_ptr<llvm::TargetMachine> target_machine(
       target->createTargetMachine(triple.str(), mcpu.str(), "", options,
                                   llvm::Reloc::PIC_, llvm::CodeModel::Small,
-                                  llvm::CodeGenOpt::Aggressive));
+                                  opt_level));
   return target_machine;
 }
 

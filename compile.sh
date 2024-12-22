@@ -1,4 +1,4 @@
-export LLVM_DIR="$(pwd)/external/llvm-16/install"
+export LLVM_DIR="$(pwd)/external/llvm-15/install"
 
 export CC="${LLVM_DIR}/bin/clang"
 export CXX="${LLVM_DIR}/bin/clang++"

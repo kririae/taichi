@@ -32,14 +32,18 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Target/TargetMachine.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/IPO.h"
 
 #include "llvm/MC/TargetRegistry.h"
-#include "llvm/Support/Host.h"
+
+#if LLVM_VERSION_MAJOR >= 16
+#include <llvm/TargetParser/Host.h>
+#else
+#include <llvm/Support/Host.h>
+#endif
 
 #endif
 
@@ -181,7 +185,11 @@ class JITSessionCPU : public JITSession {
 #endif
     if (!symbol)
       TI_ERROR("Function \"{}\" not found", Name);
+#if LLVM_VERSION_MAJOR >= 18
+    return symbol->getAddress().toPtr<void *>();
+#else
     return (void *)(symbol->getAddress());
+#endif
   }
 
   void *lookup_in_module(JITDylib *lib, const std::string Name) {
@@ -193,7 +201,11 @@ class JITSessionCPU : public JITSession {
 #endif
     if (!symbol)
       TI_ERROR("Function \"{}\" not found", Name);
+#if LLVM_VERSION_MAJOR >= 18
+    return symbol->getAddress().toPtr<void *>();
+#else
     return (void *)(symbol->getAddress());
+#endif
   }
 };
 

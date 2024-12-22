@@ -129,10 +129,14 @@ std::string JITSessionCUDA::compile_module_to_ptx(
   options.NoZerosInBSS = 0;
   options.GuaranteedTailCallOpt = 0;
 
+#if LLVM_VERSION_MAJOR >= 18
+  const auto opt_level = llvm::CodeGenOptLevel::Aggressive;
+#else
+  const auto opt_level = llvm::CodeGenOpt::Aggressive;
+#endif
   std::unique_ptr<TargetMachine> target_machine(target->createTargetMachine(
       triple.str(), CUDAContext::get_instance().get_mcpu(), cuda_mattrs(),
-      options, llvm::Reloc::PIC_, llvm::CodeModel::Small,
-      CodeGenOpt::Aggressive));
+      options, llvm::Reloc::PIC_, llvm::CodeModel::Small, opt_level));
 
   TI_ERROR_UNLESS(target_machine.get(), "Could not allocate target machine!");
 
@@ -226,8 +230,14 @@ std::string JITSessionCUDA::compile_module_to_ptx(
   // Override default to generate verbose assembly.
   target_machine->Options.MCOptions.AsmVerbose = true;
 
-  bool fail = target_machine->addPassesToEmitFile(
-      LPM, ostream, nullptr, llvm::CGFT_AssemblyFile, true);
+#if LLVM_VERSION_MAJOR >= 18
+  const auto file_type = llvm::CodeGenFileType::AssemblyFile;
+#else
+  const auto file_type = llvm::CGFT_AssemblyFile;
+#endif
+  bool fail = target_machine->addPassesToEmitFile(LPM, ostream, nullptr,
+                                                  file_type, true);
+
   TI_ERROR_IF(fail, "Failed to set up passes to emit PTX source\n");
   LPM.run(*module);
 

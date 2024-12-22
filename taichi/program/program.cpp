@@ -198,6 +198,10 @@ void Program::launch_kernel(const CompiledKernelData &compiled_kernel_data,
   // unit tests.
   //
   // Now the error is always checked even in release mode.
+  // This result in a performance hit, but it is necessary.
+  //
+  // TODO: We might add an extra option to disable this check in the future, but
+  // is there a non-synchronous way to check the error?
   if (arch_uses_llvm(compiled_kernel_data.arch())) {
     program_impl_->check_runtime_error(result_buffer);
   }

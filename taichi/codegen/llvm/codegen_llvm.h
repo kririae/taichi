@@ -49,6 +49,8 @@ class TaskCodeGenLLVM : public IRVisitor, public LLVMModuleBuilder {
   // Mainly for supporting break stmt
   llvm::BasicBlock *current_while_after_loop;
   llvm::FunctionType *task_function_type;
+
+  // sonicflux: a mapping between the stmt and its return value
   std::unordered_map<Stmt *, llvm::Value *> llvm_val;
   llvm::Function *func;
   OffloadedStmt *current_offload{nullptr};

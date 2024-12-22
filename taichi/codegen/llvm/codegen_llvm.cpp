@@ -1798,14 +1798,18 @@ void TaskCodeGenLLVM::visit(SNodeLookupStmt *stmt) {
   parent = llvm_val[stmt->input_snode];
   TI_ASSERT(parent);
   auto snode = stmt->snode;
+
   if (snode->type == SNodeType::root) {
     // FIXME: get parent_type from taichi instead of llvm.
     llvm::Type *parent_ty = builder->getInt8Ty();
+
     if (auto bit_cast = llvm::dyn_cast<llvm::BitCastInst>(parent)) {
       parent_ty = bit_cast->getDestTy();
-      if (auto ptr_ty = llvm::dyn_cast<llvm::PointerType>(parent_ty))
-        parent_ty = ptr_ty->getPointerElementType();
+      if (auto ptr_ty = llvm::dyn_cast<llvm::PointerType>(parent_ty)) {
+        TI_NOT_IMPLEMENTED;
+      }
     }
+
     llvm_val[stmt] =
         builder->CreateGEP(parent_ty, parent, llvm_val[stmt->input_index]);
   } else if (snode->type == SNodeType::dense ||
@@ -1846,7 +1850,7 @@ void TaskCodeGenLLVM::visit(GetChStmt *stmt) {
         stmt->output_snode->get_snode_tree_id(),
         stmt->output_snode->get_ch_from_parent_func_name(),
         builder->CreateBitCast(llvm_val[stmt->input_ptr],
-                               llvm::PointerType::getInt8PtrTy(*llvm_context)));
+                               llvm::PointerType::get(*llvm_context, 0)));
     llvm_val[stmt] = builder->CreateBitCast(
         ch, llvm::PointerType::get(StructCompilerLLVM::get_llvm_node_type(
                                        module.get(), stmt->output_snode),
@@ -2440,8 +2444,8 @@ void TaskCodeGenLLVM::visit(AdStackAllocaStmt *stmt) {
   auto type = llvm::ArrayType::get(llvm::Type::getInt8Ty(*llvm_context),
                                    stmt->size_in_bytes());
   auto alloca = create_entry_block_alloca(type, sizeof(int64));
-  llvm_val[stmt] = builder->CreateBitCast(
-      alloca, llvm::PointerType::getInt8PtrTy(*llvm_context));
+  llvm_val[stmt] =
+      builder->CreateBitCast(alloca, llvm::PointerType::get(*llvm_context, 0));
   call("stack_init", llvm_val[stmt]);
 }
 
@@ -2670,17 +2674,18 @@ llvm::PointerType *TaskCodeGenLLVM::get_integer_ptr_type(int bits) {
     default:
       break;
   }
-#endif
+#else
+  // opaque pointer
   switch (bits) {
     case 8:
     case 16:
     case 32:
     case 64:
       return llvm::PointerType::get(*llvm_context, 0);
-      // return llvm::Type::getInt64PtrTy(*llvm_context);
     default:
       break;
   }
+#endif
   TI_ERROR("No compatible " + std::to_string(bits) + " bits integer ptr type.");
   return nullptr;
 }

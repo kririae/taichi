@@ -103,14 +103,14 @@ void StructCompilerLLVM::generate_types(SNode &snode) {
     // mutex
     aux_type = llvm::ArrayType::get(llvm::PointerType::getInt64Ty(*ctx),
                                     snode.max_num_elements());
-    body_type = llvm::ArrayType::get(llvm::PointerType::getInt8PtrTy(*ctx),
+    body_type = llvm::ArrayType::get(llvm::PointerType::get(*ctx, 0),
                                      snode.max_num_elements());
   } else if (type == SNodeType::dynamic) {
     // mutex and n (number of elements)
     aux_type =
         llvm::StructType::get(*ctx, {llvm::PointerType::getInt32Ty(*ctx),
                                      llvm::PointerType::getInt32Ty(*ctx)});
-    body_type = llvm::PointerType::getInt8PtrTy(*ctx);
+    body_type = llvm::PointerType::get(*ctx, 0);
   } else {
     TI_P(snode.type_name());
     TI_NOT_IMPLEMENTED;
